@@ -12,6 +12,8 @@
 Cascadia Code
 
 
-> 卡号：JDTZ201010J5S098715
+2021666
+2021888
+jnh0xi64n10j
+jnh17wj7z15x
 
-> 密码：597C-4E8D-CB58-3D23
