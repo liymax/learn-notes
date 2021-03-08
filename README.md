@@ -9,6 +9,6 @@
 3、有着严谨的态度和足够的耐心，优化过很多项目代码
 
 
-### Cascadia Code:个人偏好的编程字体
+### [Cascadia Code](https://github.com/microsoft/cascadia-code/releases):个人偏好的编程字体
 
 
