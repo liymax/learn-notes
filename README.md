@@ -1,4 +1,4 @@
-# learn-notes
+## learn-notes
 
 1、熟悉较新的es语法规范和css3规范，并于合适的场景下加以运用
 
@@ -9,6 +9,6 @@
 3、有着严谨的态度和足够的耐心，优化过很多项目代码
 
 
-Cascadia Code
+### Cascadia Code:个人偏好的编程字体
 
 
