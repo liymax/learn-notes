@@ -1,0 +1,97 @@
+```go
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/go-vgo/robotgo"
+	hook "github.com/robotn/gohook"
+	"os"
+	"time"
+)
+
+type Config struct {
+	Key           string
+	FirstMoment   int
+	Period        int
+}
+
+func main() {
+	robotgo.EventHook(hook.KeyDown, []string{"ctrl", "shift", "space"}, func(e hook.Event) {
+		fmt.Println("listening program over!")
+		robotgo.EventEnd()
+	})
+	initAutoPress()
+	s := robotgo.EventStart()
+	<-robotgo.EventProcess(s)
+}
+func LoadConf(conf *[5]Config)  {
+	file, _ := os.Open("conf.json")
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	err := decoder.Decode(conf)
+	if err != nil {
+		fmt.Println("config load error:", err)
+	}
+}
+
+func initAutoPress() {
+	hasPause := true
+	ctx, cancel := context.WithCancel(context.Background())
+	robotgo.EventHook(hook.MouseDown, []string{"mleft"}, func(e hook.Event) {
+		//fmt.Printf("%v \n", e)
+		if !hasPause && e.Button == 1 {
+			cancel()
+			fmt.Println("auto press paused!")
+		}
+	})
+	startup := func(in chan string, key string, firstMoment int,period int) {
+		defer func() {
+			if err := recover(); err != nil {
+				fmt.Println("ignore:", err)
+			}
+		}()
+		for {
+			select {
+			case <- ctx.Done():
+				hasPause = true
+				_, ok := <-in
+				if ok {
+					close(in)
+				}
+				return
+			default:
+				time.Sleep(time.Duration(firstMoment) * 1e7)
+				in <- key
+				time.Sleep(time.Duration(period - firstMoment) * 1e7)
+			}
+		}
+	}
+	robotgo.EventHook(hook.KeyDown, []string{"a"}, func(e hook.Event) {
+		if hasPause {
+			hasPause = false
+			ctx, cancel = context.WithCancel(context.Background())
+			ch := make(chan string)
+			fmt.Println("loading config!")
+			conf := [5]Config{}
+			LoadConf(&conf)
+			fmt.Println("auto press startup!")
+			for _, v := range conf {
+				go startup(ch,v.Key, v.FirstMoment, v.Period)
+			}
+			go func(in chan string) {
+				for key := range in{
+					robotgo.KeyTap(key)
+				}
+			}(ch)
+		}
+	})
+}
+
+
+/**
+ * 构建命令
+ * go build -o autoKey.exe .\autoPressKey.go
+ */
+```
