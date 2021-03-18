@@ -1,6 +1,7 @@
 ```go
 package main
 
+import "C"
 import (
 	"context"
 	"encoding/json"
@@ -8,13 +9,13 @@ import (
 	"github.com/go-vgo/robotgo"
 	hook "github.com/robotn/gohook"
 	"os"
-	"time"
 )
 
 type Config struct {
 	Key           string
 	FirstMoment   int
 	Period        int
+	Longtime      int
 }
 
 func main() {
@@ -38,15 +39,28 @@ func LoadConf(conf *[5]Config)  {
 
 func initAutoPress() {
 	hasPause := true
+	inLongPress := false
+	longPressDone := make(chan bool)
 	ctx, cancel := context.WithCancel(context.Background())
 	robotgo.EventHook(hook.MouseDown, []string{"mleft"}, func(e hook.Event) {
-		//fmt.Printf("%v \n", e)
 		if !hasPause && e.Button == 1 {
 			cancel()
 			fmt.Println("auto press paused!")
 		}
 	})
-	startup := func(in chan string, key string, firstMoment int,period int) {
+	longPress := func (c Config) {
+		for {
+			select {
+			case <-longPressDone:
+				robotgo.KeyToggle(c.Key, "up")
+				return
+			default:
+				robotgo.KeyToggle(c.Key, "down")
+				robotgo.MilliSleep(10)
+			}
+		}
+	}
+	startup := func(in chan string, c Config) {
 		defer func() {
 			if err := recover(); err != nil {
 				fmt.Println("ignore:", err)
@@ -62,9 +76,19 @@ func initAutoPress() {
 				}
 				return
 			default:
-				time.Sleep(time.Duration(firstMoment) * 1e7)
-				in <- key
-				time.Sleep(time.Duration(period - firstMoment) * 1e7)
+				robotgo.MilliSleep(10 * c.FirstMoment)
+				if c.Longtime > 9 {
+					inLongPress = true
+					go longPress(c)
+					robotgo.MilliSleep(10 * c.Longtime)
+					longPressDone <- true
+					inLongPress = false
+				} else {
+					if !inLongPress {
+						in <- c.Key
+					}
+				}
+				robotgo.MilliSleep(10 * (c.Period - c.FirstMoment - c.Longtime))
 			}
 		}
 	}
@@ -77,8 +101,8 @@ func initAutoPress() {
 			conf := [5]Config{}
 			LoadConf(&conf)
 			fmt.Println("auto press startup!")
-			for _, v := range conf {
-				go startup(ch,v.Key, v.FirstMoment, v.Period)
+			for _, c := range conf {
+				go startup(ch,c)
 			}
 			go func(in chan string) {
 				for key := range in{
@@ -94,4 +118,15 @@ func initAutoPress() {
  * 构建命令
  * go build -o autoKey.exe .\autoPressKey.go
  */
+```
+
+### conf.json
+```json
+[
+  { "key": "q", "firstMoment": 3, "period": 270, "longtime": 0 },
+  { "key": "w", "firstMoment": 9, "period": 29 , "longtime": 0 },
+  { "key": "e", "firstMoment": 7, "period": 37 , "longtime": 0 },
+  { "key": "r", "firstMoment": 5, "period": 190, "longtime": 0 },
+  { "key": "g", "firstMoment": 1, "period": 400, "longtime": 0 }
+]
 ```
