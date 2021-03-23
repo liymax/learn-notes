@@ -7,9 +7,18 @@ import (
 	"fmt"
 	"github.com/go-vgo/robotgo"
 	hook "github.com/robotn/gohook"
+	"math"
 	"os"
+	"strconv"
 )
-
+type Point struct {
+	X float64
+	Y float64
+}
+func(s Point) measure(t Point) float64 {
+	square := math.Pow(s.X - t.X, 2) + math.Pow(s.Y - t.Y, 2)
+	return math.Sqrt(square)
+}
 type Config struct {
 	Key           string
 	FirstMoment   int
@@ -17,17 +26,34 @@ type Config struct {
 	HoldTime      int
 }
 
+
+var (
+	filePath string
+	nearDistance float64
+)
 func main() {
+	filePath = "conf.json"
+	nearDistance = 200
+	if len(os.Args) > 1 {
+		filePath = os.Args[1]
+	}
+	if len(os.Args) > 2 {
+		n, err :=  strconv.ParseFloat(os.Args[2],64)
+		if err == nil {
+			nearDistance = n
+		}
+	}
 	robotgo.EventHook(hook.KeyDown, []string{"ctrl", "shift", "space"}, func(e hook.Event) {
 		fmt.Println("listening program over!")
 		robotgo.EventEnd()
 	})
 	initAutoPress()
+	helpHoldLeft()
 	s := robotgo.EventStart()
 	<-robotgo.EventProcess(s)
 }
 func LoadConf(conf *[5]Config)  {
-	file, _ := os.Open("conf.json")
+	file, _ := os.Open(filePath)
 	defer file.Close()
 	decoder := json.NewDecoder(file)
 	err := decoder.Decode(conf)
@@ -35,29 +61,20 @@ func LoadConf(conf *[5]Config)  {
 		fmt.Println("config load error:", err)
 	}
 }
-
+func helpHoldLeft() {
+	robotgo.SetMouseDelay(20)
+	robotgo.EventHook(hook.KeyHold, []string{"d"}, func(e hook.Event) {
+		robotgo.MouseClick("left")
+	})
+}
 func initAutoPress() {
+	w,h := robotgo.GetScreenSize()
+	playerPos := Point{float64(w/2), float64(h/2)}
+	fmt.Printf("player default position:%v \n", playerPos)
 	isPausing := true
 	isHolding := false
 	holdCtx, holdCancel := context.WithCancel(context.TODO())
 	ctx, cancel := context.WithCancel(context.Background())
-	robotgo.EventHook(hook.KeyHold, []string{"d"}, func(e hook.Event) {
-		fmt.Printf("%v \n", e)
-		robotgo.KeyTap("p")
-		//robotgo.MouseToggle("down")
-	})
-	robotgo.EventHook(hook.KeyUp, []string{"d"}, func(e hook.Event) {
-		fmt.Printf("keyup:%v \n", e)
-		// robotgo.MouseToggle("up")
-	})
-	robotgo.EventHook(hook.MouseDown, []string{"mleft"}, func(e hook.Event) {
-		if !isPausing && e.Button == 1 {
-			cancel()
-			holdCancel()
-			isPausing = true
-			fmt.Println("auto press paused!")
-		}
-	})
 	holdPress := func (c Config) {
 		for {
 			select {
@@ -93,17 +110,60 @@ func initAutoPress() {
 			}
 		}
 	}
-	robotgo.EventHook(hook.KeyDown, []string{"a"}, func(e hook.Event) {
+	fight := func() {
 		if isPausing {
 			isPausing = false
 			ctx, cancel = context.WithCancel(context.Background())
-			fmt.Println("loading config!")
 			conf := [5]Config{}
 			LoadConf(&conf)
-			fmt.Println("auto press startup!")
+			fmt.Println("auto fight start!")
 			for _, c := range conf {
 				go startup(c)
 			}
+		}
+	}
+	pause := func() {
+		cancel()
+		holdCancel()
+		isPausing = true
+		fmt.Println("auto fight paused!")
+	}
+	nearby := func() bool{
+		x, y := robotgo.GetMousePos()
+		mousePos := Point{ float64(x), float64(y)}
+		return playerPos.measure(mousePos) < nearDistance
+	}
+	robotgo.EventHook(hook.KeyDown, []string{"a"}, func(e hook.Event) {
+		if nearby() {
+			//在怪物附近直接开打
+			fight()
+		} else {
+			//前往怪物附近然后开打
+			for {
+				if isPausing {
+					robotgo.MouseClick("left")
+				}
+				robotgo.MilliSleep(10 * 60)
+				if nearby() {
+					fight()
+					robotgo.MilliSleep(10 * 100)
+					break
+				}
+			}
+		}
+	})
+	robotgo.EventHook(hook.MouseDown, []string{}, func(e hook.Event) {
+		// 双击左键 暂停战斗
+		if !isPausing && e.Button == 1 && e.Clicks == 2{
+			pause()
+		}
+	})
+	robotgo.EventHook(hook.MouseDown, []string{}, func(e hook.Event) {
+		//鼠标右键双击定位角色位置
+		if e.Button == 2 && e.Clicks == 2 {
+			//fmt.Printf("%v \n", e)
+			playerPos = Point{ float64(e.X), float64(e.Y)}
+			fmt.Printf("player new position:%v \n", playerPos)
 		}
 	})
 }
