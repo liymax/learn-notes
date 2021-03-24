@@ -26,7 +26,6 @@ type Config struct {
 	HoldTime      int
 }
 
-
 var (
 	filePath string
 	nearDistance float64
@@ -47,7 +46,7 @@ func main() {
 		fmt.Println("listening program over!")
 		robotgo.EventEnd()
 	})
-	initAutoPress()
+	initAuto()
 	helpHoldLeft()
 	s := robotgo.EventStart()
 	<-robotgo.EventProcess(s)
@@ -67,12 +66,13 @@ func helpHoldLeft() {
 		robotgo.MouseClick("left")
 	})
 }
-func initAutoPress() {
+func initAuto() {
 	w,h := robotgo.GetScreenSize()
 	playerPos := Point{float64(w/2), float64(h/2)}
 	fmt.Printf("player default position:%v \n", playerPos)
 	isPausing := true
 	isHolding := false
+	isGoing := false
 	holdCtx, holdCancel := context.WithCancel(context.TODO())
 	ctx, cancel := context.WithCancel(context.Background())
 	holdPress := func (c Config) {
@@ -139,12 +139,20 @@ func initAutoPress() {
 			fight()
 		} else {
 			//前往怪物附近然后开打
+			if isGoing {
+				return
+			}
+			isGoing = true
 			for {
 				if isPausing {
 					robotgo.MouseClick("left")
+				} else {
+					isGoing = false
+					return
 				}
 				robotgo.MilliSleep(10 * 60)
 				if nearby() {
+					isGoing = false
 					fight()
 					robotgo.MilliSleep(10 * 100)
 					break
@@ -154,12 +162,12 @@ func initAutoPress() {
 	})
 	robotgo.EventHook(hook.MouseDown, []string{}, func(e hook.Event) {
 		// 双击左键 暂停战斗
-		if !isPausing && e.Button == 1 && e.Clicks == 2{
+		if !isPausing && e.Button == 1 && e.Clicks == 2 {
 			pause()
 		}
 	})
 	robotgo.EventHook(hook.MouseDown, []string{}, func(e hook.Event) {
-		//鼠标右键双击定位角色位置
+		//双击右键 重新定位角色位置
 		if e.Button == 2 && e.Clicks == 2 {
 			//fmt.Printf("%v \n", e)
 			playerPos = Point{ float64(e.X), float64(e.Y)}
