@@ -67,9 +67,12 @@ func main()  {
 
 /**
  * 构建命令
- * go build -o dispatcher.exe .\dispatcher.go
+ * go build -o file-server.exe .\file-server.go
  */
+ 
 ```
+
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,6 +262,4 @@ func main()  {
     </script>
 </body>
 </html>
-```html
-
 ```
